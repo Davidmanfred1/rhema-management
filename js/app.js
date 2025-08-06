@@ -103,6 +103,13 @@ class ChurchManagementSystem {
         setTimeout(() => {
             this.showNotification(`Welcome back, ${this.currentUser.name}! 🎉`, 'success');
         }, 1000);
+
+        // Show mobile tutorial on first login
+        if (window.innerWidth <= 768 && !localStorage.getItem('mobileTutorialShown')) {
+            setTimeout(() => {
+                this.showMobileTutorial();
+            }, 2000);
+        }
     }
     
     // Data Management
@@ -266,6 +273,13 @@ class ChurchManagementSystem {
                 e.preventDefault();
                 const page = item.dataset.page;
                 this.navigateTo(page);
+
+                // Close sidebar on mobile after navigation
+                if (window.innerWidth <= 768) {
+                    setTimeout(() => {
+                        this.closeSidebar();
+                    }, 150);
+                }
             });
         });
         
@@ -405,26 +419,55 @@ class ChurchManagementSystem {
     // Mobile Navigation Methods
     toggleSidebar() {
         const sidebar = document.querySelector('.sidebar');
-        sidebar.classList.toggle('open');
+        const isOpen = sidebar.classList.contains('open');
 
-        // Add/remove body scroll lock
-        if (sidebar.classList.contains('open')) {
-            document.body.style.overflow = 'hidden';
+        if (isOpen) {
+            this.closeSidebar();
         } else {
-            document.body.style.overflow = '';
+            this.openSidebar();
         }
     }
 
     closeSidebar() {
         const sidebar = document.querySelector('.sidebar');
+        const mainContent = document.querySelector('.main-content');
+        let overlay = document.querySelector('.mobile-overlay');
+
         sidebar.classList.remove('open');
+        mainContent.classList.remove('sidebar-open');
         document.body.style.overflow = '';
+
+        if (overlay) {
+            overlay.classList.remove('active');
+            setTimeout(() => {
+                if (overlay && overlay.parentNode) {
+                    overlay.parentNode.removeChild(overlay);
+                }
+            }, 300);
+        }
     }
 
     openSidebar() {
         const sidebar = document.querySelector('.sidebar');
+        const mainContent = document.querySelector('.main-content');
+        let overlay = document.querySelector('.mobile-overlay');
+
+        // Create overlay if it doesn't exist
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.className = 'mobile-overlay';
+            overlay.addEventListener('click', () => this.closeSidebar());
+            document.body.appendChild(overlay);
+        }
+
         sidebar.classList.add('open');
+        mainContent.classList.add('sidebar-open');
         document.body.style.overflow = 'hidden';
+
+        // Activate overlay with slight delay for smooth animation
+        setTimeout(() => {
+            overlay.classList.add('active');
+        }, 10);
     }
 
     // Swipe Gesture Setup
@@ -432,11 +475,13 @@ class ChurchManagementSystem {
         let startX = 0;
         let startY = 0;
         let isScrolling = false;
+        let isSwiping = false;
 
         document.addEventListener('touchstart', (e) => {
             startX = e.touches[0].clientX;
             startY = e.touches[0].clientY;
             isScrolling = false;
+            isSwiping = false;
         }, { passive: true });
 
         document.addEventListener('touchmove', (e) => {
@@ -453,14 +498,19 @@ class ChurchManagementSystem {
                 return;
             }
 
-            // Only handle horizontal swipes
-            if (!isScrolling && Math.abs(diffX) > 10) {
+            // Check if this is a horizontal swipe
+            if (Math.abs(diffX) > 10) {
+                isSwiping = true;
+            }
+
+            // Only prevent default for horizontal swipes on mobile
+            if (!isScrolling && isSwiping && window.innerWidth <= 768) {
                 e.preventDefault();
             }
         }, { passive: false });
 
         document.addEventListener('touchend', (e) => {
-            if (!startX || !startY || isScrolling) {
+            if (!startX || !startY || isScrolling || !isSwiping) {
                 startX = 0;
                 startY = 0;
                 return;
@@ -469,14 +519,19 @@ class ChurchManagementSystem {
             const endX = e.changedTouches[0].clientX;
             const diffX = startX - endX;
             const sidebar = document.querySelector('.sidebar');
+            const swipeThreshold = 80; // Increased threshold for better UX
 
-            // Swipe right to open sidebar (from left edge)
-            if (diffX < -50 && startX < 50 && window.innerWidth <= 768) {
-                this.openSidebar();
-            }
-            // Swipe left to close sidebar
-            else if (diffX > 50 && sidebar.classList.contains('open')) {
-                this.closeSidebar();
+            // Only handle swipes on mobile
+            if (window.innerWidth <= 768) {
+                // Swipe right to open sidebar (from left edge)
+                if (diffX < -swipeThreshold && startX < 80) {
+                    this.openSidebar();
+                    this.showNotification('Swipe left to close menu', 'info');
+                }
+                // Swipe left to close sidebar
+                else if (diffX > swipeThreshold && sidebar.classList.contains('open')) {
+                    this.closeSidebar();
+                }
             }
 
             startX = 0;
@@ -1415,6 +1470,58 @@ class ChurchManagementSystem {
                 notification.remove();
             }
         }, 5000);
+    }
+
+    showMobileTutorial() {
+        const tutorialHtml = `
+            <div class="modal-overlay active">
+                <div class="modal-dialog">
+                    <div class="modal-header">
+                        <h3>📱 Mobile Navigation Guide</h3>
+                        <button class="modal-close" onclick="cms.closeMobileTutorial()">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div style="text-align: center; margin-bottom: 1.5rem;">
+                            <div style="font-size: 3rem; margin-bottom: 1rem;">🕊️</div>
+                            <h4>Welcome to Rhema Church Management!</h4>
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 1rem;">
+                            <div style="display: flex; align-items: center; gap: 1rem; padding: 1rem; background: var(--gray-50); border-radius: var(--border-radius);">
+                                <div style="font-size: 1.5rem;">☰</div>
+                                <div>
+                                    <strong>Tap the menu button</strong><br>
+                                    <small>Access navigation menu</small>
+                                </div>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 1rem; padding: 1rem; background: var(--gray-50); border-radius: var(--border-radius);">
+                                <div style="font-size: 1.5rem;">👆</div>
+                                <div>
+                                    <strong>Swipe from left edge</strong><br>
+                                    <small>Open menu with gesture</small>
+                                </div>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 1rem; padding: 1rem; background: var(--gray-50); border-radius: var(--border-radius);">
+                                <div style="font-size: 1.5rem;">👈</div>
+                                <div>
+                                    <strong>Swipe left or tap outside</strong><br>
+                                    <small>Close the menu</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-primary" onclick="cms.closeMobileTutorial()">Got it! 👍</button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.getElementById('modalContainer').innerHTML = tutorialHtml;
+    }
+
+    closeMobileTutorial() {
+        localStorage.setItem('mobileTutorialShown', 'true');
+        this.closeModal();
     }
 
     formatCurrency(amount) {
