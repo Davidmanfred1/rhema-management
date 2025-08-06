@@ -28,6 +28,234 @@ class ChurchManagementSystem {
         this.setupEventListeners();
         this.checkAuth();
         this.loadSampleData();
+        this.setupMobileOptimizations();
+    }
+
+    // Mobile Device Detection and Optimization
+    setupMobileOptimizations() {
+        // Detect device type
+        this.deviceInfo = this.detectDevice();
+
+        // Apply device-specific optimizations
+        this.applyDeviceOptimizations();
+
+        // Setup performance optimizations
+        this.setupPerformanceOptimizations();
+
+        // Handle orientation changes
+        this.setupOrientationHandling();
+    }
+
+    detectDevice() {
+        const userAgent = navigator.userAgent;
+        const platform = navigator.platform;
+        const maxTouchPoints = navigator.maxTouchPoints || 0;
+
+        return {
+            isIOS: /iPad|iPhone|iPod/.test(userAgent) || (platform === 'MacIntel' && maxTouchPoints > 1),
+            isAndroid: /Android/.test(userAgent),
+            isMobile: /Mobi|Android/i.test(userAgent) || maxTouchPoints > 0,
+            isTablet: /iPad/.test(userAgent) || (platform === 'MacIntel' && maxTouchPoints > 1) || (/Android/.test(userAgent) && !/Mobile/.test(userAgent)),
+            screenWidth: window.screen.width,
+            screenHeight: window.screen.height,
+            pixelRatio: window.devicePixelRatio || 1,
+            browser: this.getBrowserInfo()
+        };
+    }
+
+    getBrowserInfo() {
+        const userAgent = navigator.userAgent;
+        if (/Chrome/.test(userAgent) && /Google Inc/.test(navigator.vendor)) return 'chrome';
+        if (/Safari/.test(userAgent) && /Apple Computer/.test(navigator.vendor)) return 'safari';
+        if (/Firefox/.test(userAgent)) return 'firefox';
+        if (/Edge/.test(userAgent)) return 'edge';
+        if (/Samsung/.test(userAgent)) return 'samsung';
+        if (/Opera/.test(userAgent)) return 'opera';
+        return 'unknown';
+    }
+
+    applyDeviceOptimizations() {
+        const body = document.body;
+
+        // Add device-specific classes
+        body.classList.add(`device-${this.deviceInfo.isIOS ? 'ios' : 'android'}`);
+        body.classList.add(`browser-${this.deviceInfo.browser}`);
+
+        if (this.deviceInfo.isMobile) {
+            body.classList.add('is-mobile');
+        }
+
+        if (this.deviceInfo.isTablet) {
+            body.classList.add('is-tablet');
+        }
+
+        // iOS-specific optimizations
+        if (this.deviceInfo.isIOS) {
+            this.setupIOSOptimizations();
+        }
+
+        // Android-specific optimizations
+        if (this.deviceInfo.isAndroid) {
+            this.setupAndroidOptimizations();
+        }
+    }
+
+    setupIOSOptimizations() {
+        // Prevent bounce scrolling
+        document.addEventListener('touchmove', (e) => {
+            if (e.target.closest('.page-content') || e.target.closest('.modal-body')) {
+                return; // Allow scrolling in content areas
+            }
+            e.preventDefault();
+        }, { passive: false });
+
+        // Handle iOS keyboard
+        this.setupIOSKeyboardHandling();
+
+        // Add iOS-specific styles
+        document.documentElement.style.setProperty('--ios-safe-top', 'env(safe-area-inset-top)');
+        document.documentElement.style.setProperty('--ios-safe-bottom', 'env(safe-area-inset-bottom)');
+    }
+
+    setupAndroidOptimizations() {
+        // Android keyboard handling
+        this.setupAndroidKeyboardHandling();
+
+        // Handle Android back button
+        if (window.history && window.history.pushState) {
+            window.addEventListener('popstate', (e) => {
+                const sidebar = document.querySelector('.sidebar');
+                if (sidebar.classList.contains('open')) {
+                    this.closeSidebar();
+                    window.history.pushState(null, null, window.location.href);
+                }
+            });
+
+            // Push initial state
+            window.history.pushState(null, null, window.location.href);
+        }
+    }
+
+    setupIOSKeyboardHandling() {
+        let initialViewportHeight = window.innerHeight;
+
+        window.addEventListener('resize', () => {
+            const currentHeight = window.innerHeight;
+            const heightDifference = initialViewportHeight - currentHeight;
+
+            if (heightDifference > 150) { // Keyboard is likely open
+                document.body.classList.add('keyboard-open');
+                // Adjust modal positioning
+                const modal = document.querySelector('.modal-dialog');
+                if (modal) {
+                    modal.style.transform = `translateY(-${heightDifference / 4}px)`;
+                }
+            } else {
+                document.body.classList.remove('keyboard-open');
+                const modal = document.querySelector('.modal-dialog');
+                if (modal) {
+                    modal.style.transform = '';
+                }
+            }
+        });
+    }
+
+    setupAndroidKeyboardHandling() {
+        // Android keyboard detection
+        const initialViewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+
+        const handleViewportChange = () => {
+            const currentHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+            const heightDifference = initialViewportHeight - currentHeight;
+
+            if (heightDifference > 150) {
+                document.body.classList.add('keyboard-open');
+                document.documentElement.style.setProperty('--keyboard-height', `${heightDifference}px`);
+            } else {
+                document.body.classList.remove('keyboard-open');
+                document.documentElement.style.setProperty('--keyboard-height', '0px');
+            }
+        };
+
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', handleViewportChange);
+        } else {
+            window.addEventListener('resize', handleViewportChange);
+        }
+    }
+
+    setupPerformanceOptimizations() {
+        // Passive event listeners for better performance
+        document.addEventListener('scroll', this.throttle(() => {
+            // Handle scroll events
+        }, 16), { passive: true });
+
+        // Optimize animations
+        if (this.deviceInfo.pixelRatio > 2) {
+            document.documentElement.classList.add('high-dpi');
+        }
+
+        // Reduce animations on low-end devices
+        if (navigator.hardwareConcurrency && navigator.hardwareConcurrency < 4) {
+            document.documentElement.classList.add('low-performance');
+        }
+
+        // Preload critical resources
+        this.preloadCriticalResources();
+    }
+
+    setupOrientationHandling() {
+        const handleOrientationChange = () => {
+            // Close sidebar on orientation change
+            if (this.deviceInfo.isMobile) {
+                this.closeSidebar();
+            }
+
+            // Adjust layout after orientation change
+            setTimeout(() => {
+                this.adjustLayoutForOrientation();
+            }, 100);
+        };
+
+        window.addEventListener('orientationchange', handleOrientationChange);
+        window.addEventListener('resize', this.throttle(handleOrientationChange, 250));
+    }
+
+    adjustLayoutForOrientation() {
+        const isLandscape = window.innerWidth > window.innerHeight;
+        document.body.classList.toggle('landscape', isLandscape);
+        document.body.classList.toggle('portrait', !isLandscape);
+
+        // Adjust stats grid for landscape
+        if (isLandscape && this.deviceInfo.isMobile) {
+            const statsGrid = document.querySelector('.stats-grid');
+            if (statsGrid) {
+                statsGrid.style.gridTemplateColumns = 'repeat(auto-fit, minmax(120px, 1fr))';
+            }
+        }
+    }
+
+    preloadCriticalResources() {
+        // Preload dove logo
+        const logoImg = new Image();
+        logoImg.src = 'assets/images/dove-logo.svg';
+
+        // Preload favicon
+        const faviconImg = new Image();
+        faviconImg.src = 'assets/images/favicon.svg';
+    }
+
+    throttle(func, limit) {
+        let inThrottle;
+        return function() {
+            const args = arguments;
+            const context = this;
+            if (!inThrottle) {
+                func.apply(context, args);
+                inThrottle = true;
+                setTimeout(() => inThrottle = false, limit);
+            }
+        };
     }
     
     // Authentication
